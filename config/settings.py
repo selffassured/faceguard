@@ -1,4 +1,3 @@
-import copy
 import json
 from pathlib import Path
 
@@ -10,17 +9,17 @@ DEFAULT_SETTINGS = {
         "port": 554,
         "path": "/onvif1",
         "username": "",
-        "password": "",
+        "password": ""
     },
     "telegram": {
         "bot_token": "",
-        "chat_id": "",
+        "chat_id": ""
     },
     "recognition": {
         "threshold": 0.45,
         "cooldown": 300,
-        "process_fps": 3,
-    },
+        "process_fps": 3
+    }
 }
 
 
@@ -31,33 +30,25 @@ class Settings:
 
     def load(self):
         if not CONFIG_PATH.exists():
-            self.data = copy.deepcopy(DEFAULT_SETTINGS)
+            self.data = DEFAULT_SETTINGS.copy()
             self.save()
             return
 
         try:
-            with CONFIG_PATH.open("r", encoding="utf-8") as file:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as file:
                 self.data = json.load(file)
-
         except (json.JSONDecodeError, OSError):
-            self.data = copy.deepcopy(DEFAULT_SETTINGS)
-            self.save()
+            self.data = DEFAULT_SETTINGS.copy()
 
     def save(self):
-        CONFIG_PATH.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-        with CONFIG_PATH.open(
-            "w",
-            encoding="utf-8",
-        ) as file:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as file:
             json.dump(
                 self.data,
                 file,
                 indent=4,
-                ensure_ascii=False,
+                ensure_ascii=False
             )
 
     def camera(self):
