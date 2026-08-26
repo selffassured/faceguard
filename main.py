@@ -1,18 +1,28 @@
 import sys
 
-from app.ui.main_window import MainWindow
 from PySide6.QtWidgets import QApplication
+
+from app.database.db import init_db
+from app.ui.main_window import MainWindow
 
 
 def main():
-    app = QApplication(sys.argv)
+    init_db()
 
-    app.setApplicationName("FaceGuard")
+    app = QApplication(
+        sys.argv
+    )
+
+    app.setApplicationName(
+        "FaceGuard"
+    )
 
     window = MainWindow()
     window.show()
 
-    sys.exit(app.exec())
+    sys.exit(
+        app.exec()
+    )
 
 
 if __name__ == "__main__":

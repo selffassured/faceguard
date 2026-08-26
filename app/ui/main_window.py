@@ -17,22 +17,28 @@ from PySide6.QtWidgets import (
 from app.camera.rtsp_client import RTSPClient
 from app.camera.camera_worker import CameraWorker
 from app.config.settings import Settings
+from app.ui.people_window import PeopleWindow
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("FaceGuard")
-        self.resize(1100, 750)
+        self.setWindowTitle(
+            "FaceGuard"
+        )
 
-        self.settings = Settings()
+        self.resize(
+            1100,
+            750
+        )
+
+        self.settings = (
+            Settings()
+        )
 
         self.camera_worker = None
-
-        # Нужен, чтобы понимать,
-        # пользователь сам нажал "Отключить"
-        # или камера реально отвалилась.
+        self.people_window = None
         self.manual_disconnect = False
 
         self.build_ui()
@@ -40,16 +46,22 @@ class MainWindow(QMainWindow):
 
     def build_ui(self):
         root = QWidget()
-        self.setCentralWidget(root)
 
-        main_layout = QVBoxLayout(root)
+        self.setCentralWidget(
+            root
+        )
 
-        # -------------------------
-        # TITLE
-        # -------------------------
+        main_layout = QVBoxLayout(
+            root
+        )
 
-        title = QLabel("FaceGuard")
-        title.setAlignment(Qt.AlignCenter)
+        title = QLabel(
+            "FaceGuard"
+        )
+
+        title.setAlignment(
+            Qt.AlignCenter
+        )
 
         font = title.font()
         font.setPointSize(22)
@@ -57,72 +69,103 @@ class MainWindow(QMainWindow):
 
         title.setFont(font)
 
-        main_layout.addWidget(title)
+        main_layout.addWidget(
+            title
+        )
 
-        # -------------------------
-        # CAMERA SETTINGS
-        # -------------------------
+        camera_group = (
+            QGroupBox(
+                "Камера"
+            )
+        )
 
-        camera_group = QGroupBox("Камера")
-        camera_form = QFormLayout(camera_group)
+        camera_form = (
+            QFormLayout(
+                camera_group
+            )
+        )
 
-        self.ip_input = QLineEdit()
+        self.ip_input = (
+            QLineEdit()
+        )
 
-        self.port_input = QSpinBox()
-        self.port_input.setRange(1, 65535)
-        self.port_input.setValue(554)
+        self.port_input = (
+            QSpinBox()
+        )
 
-        self.path_input = QLineEdit()
+        self.port_input.setRange(
+            1,
+            65535
+        )
 
-        self.username_input = QLineEdit()
+        self.port_input.setValue(
+            554
+        )
 
-        self.password_input = QLineEdit()
+        self.path_input = (
+            QLineEdit()
+        )
+
+        self.username_input = (
+            QLineEdit()
+        )
+
+        self.password_input = (
+            QLineEdit()
+        )
+
         self.password_input.setEchoMode(
             QLineEdit.Password
         )
 
         camera_form.addRow(
             "IP:",
-            self.ip_input,
+            self.ip_input
         )
 
         camera_form.addRow(
             "Порт:",
-            self.port_input,
+            self.port_input
         )
 
         camera_form.addRow(
             "RTSP path:",
-            self.path_input,
+            self.path_input
         )
 
         camera_form.addRow(
             "Логин:",
-            self.username_input,
+            self.username_input
         )
 
         camera_form.addRow(
             "Пароль:",
-            self.password_input,
+            self.password_input
         )
 
-        main_layout.addWidget(camera_group)
-
-        # -------------------------
-        # BUTTONS
-        # -------------------------
-
-        buttons_layout = QHBoxLayout()
-
-        self.connect_button = QPushButton(
-            "Подключить камеру"
+        main_layout.addWidget(
+            camera_group
         )
 
-        self.disconnect_button = QPushButton(
-            "Отключить"
+        camera_buttons = (
+            QHBoxLayout()
         )
 
-        self.disconnect_button.setEnabled(False)
+        self.connect_button = (
+            QPushButton(
+                "Подключить камеру"
+            )
+        )
+
+        self.disconnect_button = (
+            QPushButton(
+                "Отключить"
+            )
+        )
+
+        self.disconnect_button.setEnabled(
+            False
+        )
 
         self.connect_button.clicked.connect(
             self.connect_camera
@@ -132,36 +175,56 @@ class MainWindow(QMainWindow):
             self.disconnect_camera
         )
 
-        buttons_layout.addWidget(
+        camera_buttons.addWidget(
             self.connect_button
         )
 
-        buttons_layout.addWidget(
+        camera_buttons.addWidget(
             self.disconnect_button
         )
 
         main_layout.addLayout(
-            buttons_layout
+            camera_buttons
         )
 
-        # -------------------------
-        # STATUS
-        # -------------------------
+        database_buttons = (
+            QHBoxLayout()
+        )
 
-        self.status_label = QLabel(
-            "● Камера не подключена"
+        self.people_button = (
+            QPushButton(
+                "База людей"
+            )
+        )
+
+        self.people_button.clicked.connect(
+            self.open_people_window
+        )
+
+        database_buttons.addWidget(
+            self.people_button
+        )
+
+        database_buttons.addStretch()
+
+        main_layout.addLayout(
+            database_buttons
+        )
+
+        self.status_label = (
+            QLabel(
+                "● Камера не подключена"
+            )
         )
 
         main_layout.addWidget(
             self.status_label
         )
 
-        # -------------------------
-        # VIDEO
-        # -------------------------
-
-        self.video_label = QLabel(
-            "Нет видеопотока"
+        self.video_label = (
+            QLabel(
+                "Нет видеопотока"
+            )
         )
 
         self.video_label.setAlignment(
@@ -185,52 +248,58 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(
             self.video_label,
-            stretch=1,
+            stretch=1
         )
 
     def load_settings(self):
-        camera = self.settings.camera()
+        camera = (
+            self.settings.camera()
+        )
 
         self.ip_input.setText(
             camera.get(
                 "host",
-                "",
+                ""
             )
         )
 
         self.port_input.setValue(
             camera.get(
                 "port",
-                554,
+                554
             )
         )
 
         self.path_input.setText(
             camera.get(
                 "path",
-                "/onvif1",
+                "/onvif1"
             )
         )
 
         self.username_input.setText(
             camera.get(
                 "username",
-                "",
+                ""
             )
         )
 
         self.password_input.setText(
             camera.get(
                 "password",
-                "",
+                ""
             )
         )
 
     def save_camera_settings(self):
-        camera = self.settings.camera()
+        camera = (
+            self.settings.camera()
+        )
 
         camera["host"] = (
-            self.ip_input.text().strip()
+            self.ip_input
+            .text()
+            .strip()
         )
 
         camera["port"] = (
@@ -238,11 +307,15 @@ class MainWindow(QMainWindow):
         )
 
         camera["path"] = (
-            self.path_input.text().strip()
+            self.path_input
+            .text()
+            .strip()
         )
 
         camera["username"] = (
-            self.username_input.text().strip()
+            self.username_input
+            .text()
+            .strip()
         )
 
         camera["password"] = (
@@ -252,8 +325,6 @@ class MainWindow(QMainWindow):
         self.settings.save()
 
     def connect_camera(self):
-        # Если старый worker ещё не закончил,
-        # новый не создаём.
         if (
             self.camera_worker is not None
             and self.camera_worker.isRunning()
@@ -261,7 +332,10 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "FaceGuard",
-                "Камера уже подключается или работает.",
+                (
+                    "Камера уже подключается "
+                    "или работает."
+                )
             )
             return
 
@@ -273,17 +347,31 @@ class MainWindow(QMainWindow):
             self.settings.camera()
         )
 
-        host = camera_settings["host"]
-        username = camera_settings["username"]
-        password = camera_settings["password"]
-        port = camera_settings["port"]
-        path = camera_settings["path"]
+        host = (
+            camera_settings["host"]
+        )
+
+        username = (
+            camera_settings["username"]
+        )
+
+        password = (
+            camera_settings["password"]
+        )
+
+        port = (
+            camera_settings["port"]
+        )
+
+        path = (
+            camera_settings["path"]
+        )
 
         if not host:
             QMessageBox.warning(
                 self,
                 "FaceGuard",
-                "Введите IP камеры.",
+                "Введите IP камеры."
             )
             return
 
@@ -292,18 +380,25 @@ class MainWindow(QMainWindow):
             username=username,
             password=password,
             port=port,
-            path=path,
+            path=path
         )
 
         self.status_label.setText(
             "● Подключение..."
         )
 
-        self.connect_button.setEnabled(False)
-        self.disconnect_button.setEnabled(True)
+        self.connect_button.setEnabled(
+            False
+        )
 
-        self.camera_worker = CameraWorker(
-            client.url
+        self.disconnect_button.setEnabled(
+            True
+        )
+
+        self.camera_worker = (
+            CameraWorker(
+                client.url
+            )
         )
 
         self.camera_worker.frame_ready.connect(
@@ -322,9 +417,6 @@ class MainWindow(QMainWindow):
             self.on_camera_error
         )
 
-        # Критически важная строка:
-        # объект удаляем только после
-        # фактического завершения QThread.
         self.camera_worker.finished.connect(
             self.on_worker_finished
         )
@@ -346,21 +438,26 @@ class MainWindow(QMainWindow):
             "● Отключение..."
         )
 
-        self.disconnect_button.setEnabled(False)
+        self.disconnect_button.setEnabled(
+            False
+        )
 
-        # Только просим worker завершиться.
-        # НЕ уничтожаем объект.
         self.camera_worker.stop()
 
-    def update_frame(self, image):
-        pixmap = QPixmap.fromImage(
-            image
+    def update_frame(
+        self,
+        image
+    ):
+        pixmap = (
+            QPixmap.fromImage(
+                image
+            )
         )
 
         pixmap = pixmap.scaled(
             self.video_label.size(),
             Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
+            Qt.SmoothTransformation
         )
 
         self.video_label.setPixmap(
@@ -380,10 +477,16 @@ class MainWindow(QMainWindow):
             return
 
         self.status_label.setText(
-            "● Соединение потеряно. Переподключение..."
+            (
+                "● Соединение потеряно. "
+                "Переподключение..."
+            )
         )
 
-    def on_camera_error(self, message):
+    def on_camera_error(
+        self,
+        message
+    ):
         if self.manual_disconnect:
             return
 
@@ -393,14 +496,12 @@ class MainWindow(QMainWindow):
 
         print(
             "[CAMERA ERROR]",
-            message,
+            message
         )
 
     def on_worker_finished(self):
         worker = self.sender()
 
-        # Если завершился именно текущий worker,
-        # только теперь убираем ссылку на него.
         if worker is self.camera_worker:
             self.camera_worker = None
 
@@ -420,34 +521,53 @@ class MainWindow(QMainWindow):
             "Нет видеопотока"
         )
 
-        self.connect_button.setEnabled(True)
-        self.disconnect_button.setEnabled(False)
+        self.connect_button.setEnabled(
+            True
+        )
 
-    def closeEvent(self, event):
-        """
-        При закрытии окна ждём завершения worker,
-        чтобы Qt не уничтожил работающий QThread.
-        """
+        self.disconnect_button.setEnabled(
+            False
+        )
 
-        worker = self.camera_worker
+    def open_people_window(self):
+        if (
+            self.people_window is None
+            or not self.people_window.isVisible()
+        ):
+            self.people_window = (
+                PeopleWindow()
+            )
+
+            self.people_window.show()
+
+            return
+
+        self.people_window.raise_()
+        self.people_window.activateWindow()
+
+    def closeEvent(
+        self,
+        event
+    ):
+        worker = (
+            self.camera_worker
+        )
 
         if (
             worker is not None
             and worker.isRunning()
         ):
             worker.stop()
-
-            # У нас open/read timeout = 5 секунд.
-            # Даём немного запаса.
             worker.wait(7000)
 
             if worker.isRunning():
                 print(
-                    "[CAMERA] Worker did not stop in time"
+                    (
+                        "[CAMERA] Worker did "
+                        "not stop in time"
+                    )
                 )
 
-                # Не даём приложению закрыться,
-                # пока поток реально жив.
                 event.ignore()
                 return
 
