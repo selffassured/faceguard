@@ -1,0 +1,27 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+
+# Runtime data
+data/faces/*
+data/detections/*
+data/logs/*
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets/config
+config/settings.json
+.env
+
+# Build
+dist/
+build/
+*.spec
+
+# OS
+.DS_Store
+Thumbs.db
