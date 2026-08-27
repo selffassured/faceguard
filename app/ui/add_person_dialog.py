@@ -12,11 +12,12 @@ from PySide6.QtWidgets import (
     QListWidget,
     QFileDialog,
     QMessageBox,
-    QLabel
+    QLabel,
+    QApplication
 )
 
-from app.database.people_repository import (
-    PeopleRepository
+from app.services.person_service import (
+    PersonService
 )
 
 
@@ -32,15 +33,13 @@ class AddPersonDialog(QDialog):
         )
 
         self.resize(
-            600,
-            500
-        )
-
-        self.repository = (
-            PeopleRepository()
+            620,
+            520
         )
 
         self.photo_paths = []
+
+        self.person_service = None
 
         self.build_ui()
 
@@ -50,7 +49,7 @@ class AddPersonDialog(QDialog):
         )
 
         title = QLabel(
-            "Новый человек"
+            "Добавление человека"
         )
 
         title.setAlignment(
@@ -60,6 +59,7 @@ class AddPersonDialog(QDialog):
         font = title.font()
         font.setPointSize(18)
         font.setBold(True)
+
         title.setFont(font)
 
         layout.addWidget(
@@ -68,12 +68,16 @@ class AddPersonDialog(QDialog):
 
         form = QFormLayout()
 
-        self.name_input = (
-            QLineEdit()
+        self.name_input = QLineEdit()
+
+        self.name_input.setPlaceholderText(
+            "Например: Иван Иванов"
         )
 
-        self.comment_input = (
-            QTextEdit()
+        self.comment_input = QTextEdit()
+
+        self.comment_input.setPlaceholderText(
+            "Необязательный комментарий"
         )
 
         self.comment_input.setFixedHeight(
@@ -95,35 +99,27 @@ class AddPersonDialog(QDialog):
         )
 
         photos_label = QLabel(
-            "Фотографии:"
+            "Фотографии человека"
         )
 
         layout.addWidget(
             photos_label
         )
 
-        self.photos_list = (
-            QListWidget()
-        )
+        self.photos_list = QListWidget()
 
         layout.addWidget(
             self.photos_list
         )
 
-        photo_buttons = (
-            QHBoxLayout()
+        photo_buttons = QHBoxLayout()
+
+        self.add_photo_button = QPushButton(
+            "Добавить фотографии"
         )
 
-        self.add_photo_button = (
-            QPushButton(
-                "Добавить фотографии"
-            )
-        )
-
-        self.remove_photo_button = (
-            QPushButton(
-                "Удалить выбранную"
-            )
+        self.remove_photo_button = QPushButton(
+            "Удалить выбранную"
         )
 
         self.add_photo_button.clicked.connect(
@@ -146,18 +142,36 @@ class AddPersonDialog(QDialog):
             photo_buttons
         )
 
-        buttons = QHBoxLayout()
-
-        self.save_button = (
-            QPushButton(
-                "Сохранить"
-            )
+        info_label = QLabel(
+            "Рекомендуется 3–5 фотографий. "
+            "На каждой фотографии должен быть "
+            "один хорошо видимый человек."
         )
 
-        self.cancel_button = (
-            QPushButton(
-                "Отмена"
-            )
+        info_label.setWordWrap(
+            True
+        )
+
+        layout.addWidget(
+            info_label
+        )
+
+        self.status_label = QLabel(
+            ""
+        )
+
+        layout.addWidget(
+            self.status_label
+        )
+
+        buttons = QHBoxLayout()
+
+        self.save_button = QPushButton(
+            "Сохранить"
+        )
+
+        self.cancel_button = QPushButton(
+            "Отмена"
         )
 
         self.save_button.clicked.connect(
@@ -167,6 +181,8 @@ class AddPersonDialog(QDialog):
         self.cancel_button.clicked.connect(
             self.reject
         )
+
+        buttons.addStretch()
 
         buttons.addWidget(
             self.save_button
@@ -186,16 +202,13 @@ class AddPersonDialog(QDialog):
             "Выберите фотографии",
             "",
             (
-                "Images "
+                "Изображения "
                 "(*.jpg *.jpeg *.png *.bmp *.webp)"
             )
         )
 
         for file_path in files:
-            if (
-                file_path
-                not in self.photo_paths
-            ):
+            if file_path not in self.photo_paths:
                 self.photo_paths.append(
                     file_path
                 )
@@ -218,9 +231,46 @@ class AddPersonDialog(QDialog):
             row
         )
 
-        del self.photo_paths[
-            row
-        ]
+        del self.photo_paths[row]
+
+    def set_processing(
+        self,
+        processing: bool
+    ):
+        self.save_button.setEnabled(
+            not processing
+        )
+
+        self.cancel_button.setEnabled(
+            not processing
+        )
+
+        self.add_photo_button.setEnabled(
+            not processing
+        )
+
+        self.remove_photo_button.setEnabled(
+            not processing
+        )
+
+        self.name_input.setEnabled(
+            not processing
+        )
+
+        self.comment_input.setEnabled(
+            not processing
+        )
+
+        if processing:
+            self.status_label.setText(
+                "Загрузка InsightFace и обработка фотографий..."
+            )
+        else:
+            self.status_label.setText(
+                ""
+            )
+
+        QApplication.processEvents()
 
     def save_person(self):
         name = (
@@ -241,40 +291,79 @@ class AddPersonDialog(QDialog):
                 "FaceGuard",
                 "Введите имя человека."
             )
+
             return
 
         if not self.photo_paths:
             QMessageBox.warning(
                 self,
                 "FaceGuard",
-                (
-                    "Добавьте хотя бы "
-                    "одну фотографию."
-                )
+                "Добавьте хотя бы одну фотографию."
             )
+
             return
 
+        self.set_processing(
+            True
+        )
+
         try:
-            self.repository.add_person(
-                name=name,
-                photo_paths=(
-                    self.photo_paths
-                ),
-                comment=comment
+            if self.person_service is None:
+                self.person_service = (
+                    PersonService()
+                )
+
+            result = (
+                self.person_service
+                .add_person(
+                    name=name,
+                    photo_paths=self.photo_paths,
+                    comment=comment
+                )
             )
 
         except Exception as exc:
+            self.set_processing(
+                False
+            )
+
             QMessageBox.critical(
                 self,
                 "FaceGuard",
-                str(exc)
+                (
+                    "Не удалось добавить человека:\n\n"
+                    f"{exc}"
+                )
             )
+
             return
+
+        self.set_processing(
+            False
+        )
+
+        successful_count = len(
+            result["successful"]
+        )
+
+        failed_count = len(
+            result["failed"]
+        )
+
+        message = (
+            f"Человек добавлен.\n\n"
+            f"Embeddings сохранено: {successful_count}"
+        )
+
+        if failed_count:
+            message += (
+                f"\nФотографий пропущено: {failed_count}"
+            )
 
         QMessageBox.information(
             self,
             "FaceGuard",
-            "Человек добавлен в базу."
+            message
         )
 
         self.accept()

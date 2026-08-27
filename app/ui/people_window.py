@@ -1,22 +1,17 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
+    QHeaderView,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QMessageBox,
-    QHeaderView
+    QVBoxLayout,
+    QWidget,
 )
 
-from app.database.people_repository import (
-    PeopleRepository
-)
-
-from app.ui.add_person_dialog import (
-    AddPersonDialog
-)
+from app.database.people_repository import PeopleRepository
+from app.ui.add_person_dialog import AddPersonDialog
 
 
 class PeopleWindow(QWidget):

@@ -1,21 +1,21 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
     QFormLayout,
-    QLineEdit,
-    QSpinBox,
-    QPushButton,
-    QLabel,
-    QMessageBox,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
-from app.camera.rtsp_client import RTSPClient
 from app.camera.camera_worker import CameraWorker
+from app.camera.rtsp_client import RTSPClient
 from app.config.settings import Settings
 from app.ui.people_window import PeopleWindow
 
@@ -477,10 +477,10 @@ class MainWindow(QMainWindow):
             return
 
         self.status_label.setText(
-            (
+            
                 "● Соединение потеряно. "
                 "Переподключение..."
-            )
+            
         )
 
     def on_camera_error(
