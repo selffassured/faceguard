@@ -1,67 +1,83 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
+
 from PySide6.QtWidgets import (
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
     QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
     QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFormLayout,
+    QLineEdit,
+    QSpinBox,
+    QPushButton,
+    QLabel,
+    QMessageBox,
+    QGroupBox,
 )
 
-from app.camera.camera_worker import CameraWorker
 from app.camera.rtsp_client import RTSPClient
+from app.camera.camera_worker import CameraWorker
+from app.recognition.recognition_worker import RecognitionWorker
 from app.config.settings import Settings
+from app.services.monitoring_service import MonitoringService
 from app.ui.people_window import PeopleWindow
+from app.ui.settings_window import SettingsWindow
+from app.ui.history_window import HistoryWindow
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle(
-            "FaceGuard"
-        )
+        self.setWindowTitle("FaceGuard")
+        self.resize(1200, 820)
 
-        self.resize(
-            1100,
-            750
-        )
-
-        self.settings = (
-            Settings()
-        )
+        self.settings = Settings()
 
         self.camera_worker = None
+        self.recognition_worker = None
+
         self.people_window = None
+        self.history_window = None
+
         self.manual_disconnect = False
+        self.recognition_enabled = False
+
+        self.monitoring_service = None
 
         self.build_ui()
         self.load_settings()
+        self.create_monitoring_service()
+
+    def create_monitoring_service(self):
+        telegram = self.settings.telegram()
+        recognition = self.settings.recognition()
+
+        self.monitoring_service = MonitoringService(
+            bot_token=telegram.get(
+                "bot_token",
+                ""
+            ),
+            chat_id=telegram.get(
+                "chat_id",
+                ""
+            ),
+            cooldown_seconds=int(
+                recognition.get(
+                    "cooldown",
+                    300
+                )
+            ),
+        )
 
     def build_ui(self):
         root = QWidget()
+        self.setCentralWidget(root)
 
-        self.setCentralWidget(
-            root
-        )
+        main_layout = QVBoxLayout(root)
 
-        main_layout = QVBoxLayout(
-            root
-        )
-
-        title = QLabel(
-            "FaceGuard"
-        )
-
-        title.setAlignment(
-            Qt.AlignCenter
-        )
+        title = QLabel("FaceGuard")
+        title.setAlignment(Qt.AlignCenter)
 
         font = title.font()
         font.setPointSize(22)
@@ -69,50 +85,22 @@ class MainWindow(QMainWindow):
 
         title.setFont(font)
 
-        main_layout.addWidget(
-            title
-        )
+        main_layout.addWidget(title)
 
-        camera_group = (
-            QGroupBox(
-                "Камера"
-            )
-        )
+        camera_group = QGroupBox("Камера")
+        camera_form = QFormLayout(camera_group)
 
-        camera_form = (
-            QFormLayout(
-                camera_group
-            )
-        )
+        self.ip_input = QLineEdit()
 
-        self.ip_input = (
-            QLineEdit()
-        )
-
-        self.port_input = (
-            QSpinBox()
-        )
-
+        self.port_input = QSpinBox()
         self.port_input.setRange(
             1,
             65535
         )
 
-        self.port_input.setValue(
-            554
-        )
-
-        self.path_input = (
-            QLineEdit()
-        )
-
-        self.username_input = (
-            QLineEdit()
-        )
-
-        self.password_input = (
-            QLineEdit()
-        )
+        self.path_input = QLineEdit()
+        self.username_input = QLineEdit()
+        self.password_input = QLineEdit()
 
         self.password_input.setEchoMode(
             QLineEdit.Password
@@ -147,20 +135,14 @@ class MainWindow(QMainWindow):
             camera_group
         )
 
-        camera_buttons = (
-            QHBoxLayout()
+        camera_buttons = QHBoxLayout()
+
+        self.connect_button = QPushButton(
+            "Подключить камеру"
         )
 
-        self.connect_button = (
-            QPushButton(
-                "Подключить камеру"
-            )
-        )
-
-        self.disconnect_button = (
-            QPushButton(
-                "Отключить"
-            )
+        self.disconnect_button = QPushButton(
+            "Отключить"
         )
 
         self.disconnect_button.setEnabled(
@@ -187,44 +169,100 @@ class MainWindow(QMainWindow):
             camera_buttons
         )
 
-        database_buttons = (
-            QHBoxLayout()
+        action_buttons = QHBoxLayout()
+
+        self.people_button = QPushButton(
+            "База людей"
         )
 
-        self.people_button = (
-            QPushButton(
-                "База людей"
-            )
+        self.history_button = QPushButton(
+            "История"
+        )
+
+        self.settings_button = QPushButton(
+            "Настройки"
+        )
+
+        self.recognition_button = QPushButton(
+            "Запустить распознавание"
+        )
+
+        self.recognition_button.setEnabled(
+            False
         )
 
         self.people_button.clicked.connect(
             self.open_people_window
         )
 
-        database_buttons.addWidget(
+        self.history_button.clicked.connect(
+            self.open_history_window
+        )
+
+        self.settings_button.clicked.connect(
+            self.open_settings_window
+        )
+
+        self.recognition_button.clicked.connect(
+            self.toggle_recognition
+        )
+
+        action_buttons.addWidget(
             self.people_button
         )
 
-        database_buttons.addStretch()
-
-        main_layout.addLayout(
-            database_buttons
+        action_buttons.addWidget(
+            self.history_button
         )
 
-        self.status_label = (
-            QLabel(
-                "● Камера не подключена"
-            )
+        action_buttons.addWidget(
+            self.settings_button
+        )
+
+        action_buttons.addWidget(
+            self.recognition_button
+        )
+
+        action_buttons.addStretch()
+
+        main_layout.addLayout(
+            action_buttons
+        )
+
+        self.status_label = QLabel(
+            "● Камера не подключена"
         )
 
         main_layout.addWidget(
             self.status_label
         )
 
-        self.video_label = (
-            QLabel(
-                "Нет видеопотока"
-            )
+        self.recognition_status_label = QLabel(
+            "AI: выключен"
+        )
+
+        main_layout.addWidget(
+            self.recognition_status_label
+        )
+
+        self.last_person_label = QLabel(
+            "Последнее распознавание: —"
+        )
+
+        main_layout.addWidget(
+            self.last_person_label
+        )
+
+        self.telegram_status_label = QLabel(
+            "Telegram: ожидание"
+        )
+
+        main_layout.addWidget(
+            self.telegram_status_label
+        )
+
+        self.video_label = QLabel(
+            "Нет видеопотока"
         )
 
         self.video_label.setAlignment(
@@ -232,8 +270,8 @@ class MainWindow(QMainWindow):
         )
 
         self.video_label.setMinimumSize(
-            800,
-            450
+            900,
+            500
         )
 
         self.video_label.setStyleSheet(
@@ -252,9 +290,7 @@ class MainWindow(QMainWindow):
         )
 
     def load_settings(self):
-        camera = (
-            self.settings.camera()
-        )
+        camera = self.settings.camera()
 
         self.ip_input.setText(
             camera.get(
@@ -292,9 +328,7 @@ class MainWindow(QMainWindow):
         )
 
     def save_camera_settings(self):
-        camera = (
-            self.settings.camera()
-        )
+        camera = self.settings.camera()
 
         camera["host"] = (
             self.ip_input
@@ -303,7 +337,8 @@ class MainWindow(QMainWindow):
         )
 
         camera["port"] = (
-            self.port_input.value()
+            self.port_input
+            .value()
         )
 
         camera["path"] = (
@@ -319,7 +354,8 @@ class MainWindow(QMainWindow):
         )
 
         camera["password"] = (
-            self.password_input.text()
+            self.password_input
+            .text()
         )
 
         self.settings.save()
@@ -329,45 +365,13 @@ class MainWindow(QMainWindow):
             self.camera_worker is not None
             and self.camera_worker.isRunning()
         ):
-            QMessageBox.information(
-                self,
-                "FaceGuard",
-                (
-                    "Камера уже подключается "
-                    "или работает."
-                )
-            )
             return
-
-        self.manual_disconnect = False
 
         self.save_camera_settings()
 
-        camera_settings = (
-            self.settings.camera()
-        )
+        camera = self.settings.camera()
 
-        host = (
-            camera_settings["host"]
-        )
-
-        username = (
-            camera_settings["username"]
-        )
-
-        password = (
-            camera_settings["password"]
-        )
-
-        port = (
-            camera_settings["port"]
-        )
-
-        path = (
-            camera_settings["path"]
-        )
-
-        if not host:
+        if not camera["host"]:
             QMessageBox.warning(
                 self,
                 "FaceGuard",
@@ -376,11 +380,11 @@ class MainWindow(QMainWindow):
             return
 
         client = RTSPClient(
-            host=host,
-            username=username,
-            password=password,
-            port=port,
-            path=path
+            host=camera["host"],
+            username=camera["username"],
+            password=camera["password"],
+            port=camera["port"],
+            path=camera["path"],
         )
 
         self.status_label.setText(
@@ -395,14 +399,12 @@ class MainWindow(QMainWindow):
             True
         )
 
-        self.camera_worker = (
-            CameraWorker(
-                client.url
-            )
+        self.camera_worker = CameraWorker(
+            client.url
         )
 
         self.camera_worker.frame_ready.connect(
-            self.update_frame
+            self.update_camera_frame
         )
 
         self.camera_worker.connected.connect(
@@ -418,40 +420,45 @@ class MainWindow(QMainWindow):
         )
 
         self.camera_worker.finished.connect(
-            self.on_worker_finished
+            self.on_camera_worker_finished
         )
 
         self.camera_worker.start()
 
     def disconnect_camera(self):
-        if self.camera_worker is None:
-            self.reset_camera_ui()
-            return
+        self.stop_recognition()
 
-        if not self.camera_worker.isRunning():
-            self.reset_camera_ui()
-            return
+        if self.camera_worker is not None:
+            self.camera_worker.stop()
 
-        self.manual_disconnect = True
-
-        self.status_label.setText(
-            "● Отключение..."
-        )
-
-        self.disconnect_button.setEnabled(
-            False
-        )
-
-        self.camera_worker.stop()
-
-    def update_frame(
+    def update_camera_frame(
         self,
         image
     ):
-        pixmap = (
-            QPixmap.fromImage(
-                image
-            )
+        if self.recognition_enabled:
+            return
+
+        self.show_image(
+            image
+        )
+
+    def update_recognition_frame(
+        self,
+        image
+    ):
+        if not self.recognition_enabled:
+            return
+
+        self.show_image(
+            image
+        )
+
+    def show_image(
+        self,
+        image
+    ):
+        pixmap = QPixmap.fromImage(
+            image
         )
 
         pixmap = pixmap.scaled(
@@ -465,33 +472,27 @@ class MainWindow(QMainWindow):
         )
 
     def on_camera_connected(self):
-        if self.manual_disconnect:
-            return
-
         self.status_label.setText(
             "● Камера подключена"
         )
 
-    def on_camera_disconnected(self):
-        if self.manual_disconnect:
-            return
-
-        self.status_label.setText(
-            
-                "● Соединение потеряно. "
-                "Переподключение..."
-            
+        self.recognition_button.setEnabled(
+            True
         )
+
+    def on_camera_disconnected(self):
+        self.status_label.setText(
+            "● Камера переподключается..."
+        )
+
+        self.stop_recognition()
 
     def on_camera_error(
         self,
         message
     ):
-        if self.manual_disconnect:
-            return
-
         self.status_label.setText(
-            "● Ошибка подключения"
+            "● Ошибка камеры"
         )
 
         print(
@@ -499,7 +500,7 @@ class MainWindow(QMainWindow):
             message
         )
 
-    def on_worker_finished(self):
+    def on_camera_worker_finished(self):
         worker = self.sender()
 
         if worker is self.camera_worker:
@@ -510,7 +511,201 @@ class MainWindow(QMainWindow):
 
         self.reset_camera_ui()
 
+    def toggle_recognition(self):
+        if self.recognition_enabled:
+            self.stop_recognition()
+        else:
+            self.start_recognition()
+
+    def start_recognition(self):
+        if (
+            self.camera_worker is None
+            or not self.camera_worker.isRunning()
+        ):
+            QMessageBox.warning(
+                self,
+                "FaceGuard",
+                "Сначала подключите камеру."
+            )
+            return
+
+        recognition = (
+            self.settings
+            .recognition()
+        )
+
+        self.create_monitoring_service()
+
+        self.recognition_enabled = True
+
+        self.recognition_button.setText(
+            "Остановить распознавание"
+        )
+
+        self.recognition_worker = RecognitionWorker(
+            camera_worker=self.camera_worker,
+            threshold=float(
+                recognition.get(
+                    "threshold",
+                    0.45
+                )
+            ),
+            process_fps=int(
+                recognition.get(
+                    "process_fps",
+                    3
+                )
+            ),
+        )
+
+        self.recognition_worker.frame_ready.connect(
+            self.update_recognition_frame
+        )
+
+        self.recognition_worker.status.connect(
+            self.on_recognition_status
+        )
+
+        self.recognition_worker.recognized.connect(
+            self.on_person_recognized
+        )
+
+        self.recognition_worker.finished.connect(
+            self.on_recognition_worker_finished
+        )
+
+        self.recognition_worker.start()
+
+    def stop_recognition(self):
+        self.recognition_enabled = False
+
+        self.recognition_button.setText(
+            "Запустить распознавание"
+        )
+
+        self.recognition_status_label.setText(
+            "AI: выключен"
+        )
+
+        if self.recognition_worker is not None:
+            self.recognition_worker.stop()
+
+    def on_recognition_status(
+        self,
+        message
+    ):
+        if self.recognition_enabled:
+            self.recognition_status_label.setText(
+                f"AI: {message}"
+            )
+
+    def on_person_recognized(
+        self,
+        data
+    ):
+        name = data["name"]
+        similarity = data["similarity"]
+
+        self.last_person_label.setText(
+            (
+                "Последнее распознавание: "
+                f"{name} ({similarity:.2f})"
+            )
+        )
+
+        try:
+            result = (
+                self.monitoring_service
+                .handle_recognition(
+                    person_id=data["person_id"],
+                    name=name,
+                    similarity=similarity,
+                    frame=data["frame"],
+                )
+            )
+
+        except Exception as exc:
+            print(
+                "[MONITORING ERROR]",
+                exc
+            )
+            return
+
+        if not result["triggered"]:
+            return
+
+        if result["telegram_sent"]:
+            self.telegram_status_label.setText(
+                f"Telegram: отправлено — {name}"
+            )
+
+        elif result["telegram_error"]:
+            self.telegram_status_label.setText(
+                "Telegram: ошибка"
+            )
+
+            print(
+                "[TELEGRAM ERROR]",
+                result["telegram_error"]
+            )
+
+        else:
+            self.telegram_status_label.setText(
+                "Telegram: не настроен"
+            )
+
+    def on_recognition_worker_finished(self):
+        worker = self.sender()
+
+        if worker is self.recognition_worker:
+            self.recognition_worker = None
+
+        if worker is not None:
+            worker.deleteLater()
+
+        self.recognition_enabled = False
+
+        self.recognition_button.setText(
+            "Запустить распознавание"
+        )
+
+    def open_people_window(self):
+        if (
+            self.people_window is None
+            or not self.people_window.isVisible()
+        ):
+            self.people_window = PeopleWindow()
+            self.people_window.show()
+            return
+
+        self.people_window.raise_()
+        self.people_window.activateWindow()
+
+    def open_history_window(self):
+        if (
+            self.history_window is None
+            or not self.history_window.isVisible()
+        ):
+            self.history_window = HistoryWindow()
+            self.history_window.show()
+            return
+
+        self.history_window.load_history()
+        self.history_window.raise_()
+        self.history_window.activateWindow()
+
+    def open_settings_window(self):
+        dialog = SettingsWindow(
+            self
+        )
+
+        if dialog.exec():
+            self.settings = Settings()
+            self.create_monitoring_service()
+
     def reset_camera_ui(self):
+        self.stop_recognition()
+
         self.status_label.setText(
             "● Камера не подключена"
         )
@@ -529,45 +724,35 @@ class MainWindow(QMainWindow):
             False
         )
 
-    def open_people_window(self):
-        if (
-            self.people_window is None
-            or not self.people_window.isVisible()
-        ):
-            self.people_window = (
-                PeopleWindow()
-            )
-
-            self.people_window.show()
-
-            return
-
-        self.people_window.raise_()
-        self.people_window.activateWindow()
+        self.recognition_button.setEnabled(
+            False
+        )
 
     def closeEvent(
         self,
         event
     ):
-        worker = (
-            self.camera_worker
-        )
+        if (
+            self.recognition_worker is not None
+            and self.recognition_worker.isRunning()
+        ):
+            self.recognition_worker.stop()
+
+            self.recognition_worker.wait(
+                10000
+            )
 
         if (
-            worker is not None
-            and worker.isRunning()
+            self.camera_worker is not None
+            and self.camera_worker.isRunning()
         ):
-            worker.stop()
-            worker.wait(7000)
+            self.camera_worker.stop()
 
-            if worker.isRunning():
-                print(
-                    (
-                        "[CAMERA] Worker did "
-                        "not stop in time"
-                    )
-                )
+            self.camera_worker.wait(
+                7000
+            )
 
+            if self.camera_worker.isRunning():
                 event.ignore()
                 return
 
